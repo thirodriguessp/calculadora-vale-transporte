@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calculadora de Vale-Transporte</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.1);
+    --border-md: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text2: #6b6a65;
+    --text3: #9b9a94;
+    --blue-bg: #e6f1fb;
+    --blue-text: #0c447c;
+    --blue-border: #b5d4f4;
+    --green-bg: #eaf3de;
+    --green-text: #27500a;
+    --amber-bg: #faeeda;
+    --amber-text: #633806;
+    --red-bg: #fcebeb;
+    --red-text: #791f1f;
+    --info-border: #378add;
+    --radius: 10px;
+    --radius-sm: 7px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --surface: #252523;
+      --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.1);
+      --border-md: rgba(255,255,255,0.18);
+      --text: #f0efe9;
+      --text2: #9b9a94;
+      --text3: #6b6a65;
+      --blue-bg: #042c53;
+      --blue-text: #85b7eb;
+      --blue-border: #185fa5;
+      --green-bg: #173404;
+      --green-text: #c0dd97;
+      --amber-bg: #412402;
+      --amber-text: #fac775;
+      --red-bg: #501313;
+      --red-text: #f09595;
+      --info-border: #378add;
+    }
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.5; min-height: 100vh; }
+  .container { max-width: 640px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 13px; color: var(--text2); margin-bottom: 1.5rem; }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 13px; color: var(--text2); }
+  .field input, .field select {
+    font-family: inherit; font-size: 14px; padding: 8px 12px;
+    border: 0.5px solid var(--border-md); border-radius: var(--radius-sm);
+    background: var(--surface2); color: var(--text); outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--info-border); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn {
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    padding: 10px 20px; border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border-md); cursor: pointer;
+    background: var(--surface); color: var(--text); width: 100%;
+    transition: background 0.1s, opacity 0.1s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--text); color: var(--bg); border-color: transparent; }
+  .btn-primary:hover { opacity: 0.85; background: var(--text); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-sm { font-size: 13px; padding: 7px 14px; width: auto; }
+  .route-card {
+    border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    padding: 1rem; margin-bottom: 8px;
+  }
+  .route-card.selected { border: 1.5px solid var(--info-border); background: var(--blue-bg); }
+  .route-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .route-time { font-size: 15px; font-weight: 600; }
+  .route-dur { font-size: 13px; color: var(--text2); }
+  .steps { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .badge { font-size: 12px; padding: 3px 9px; border-radius: 99px; border: 0.5px solid var(--border); background: var(--surface2); color: var(--text2); }
+  .badge.transit { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+  .fare-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; border-top: 0.5px solid var(--border); padding-top: 8px; }
+  .fare-row label { font-size: 13px; color: var(--text2); flex: 1; }
+  .fare-auto { font-size: 14px; font-weight: 600; color: var(--green-text); }
+  .fare-input { width: 90px; text-align: right; }
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+  .metric { background: var(--surface2); border-radius: var(--radius-sm); padding: 1rem; }
+  .metric-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .metric-value { font-size: 22px; font-weight: 600; }
+  .lines-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .lines-table td { padding: 7px 0; border-bottom: 0.5px solid var(--border); }
+  .lines-table tr:last-child td { border-bottom: none; }
+  .lines-table td:last-child { text-align: right; font-weight: 600; }
+  .tag { font-size: 11px; padding: 2px 6px; border-radius: 99px; margin-left: 3px; }
+  .tag-ida { background: var(--green-bg); color: var(--green-text); }
+  .tag-volta { background: var(--amber-bg); color: var(--amber-text); }
+  .alert { font-size: 13px; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 10px; }
+  .alert-warn { background: var(--amber-bg); color: var(--amber-text); }
+  .alert-err { background: var(--red-bg); color: var(--red-text); }
+  .alert-ok { background: var(--green-bg); color: var(--green-text); }
+  .alert-info { background: var(--blue-bg); color: var(--blue-text); }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border-md); border-top-color: var(--text2); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+  .divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
+  .raw-toggle { font-size: 12px; color: var(--text3); cursor: pointer; text-decoration: underline; margin-top: 8px; display: block; }
+  .raw-box { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; background: var(--surface2); border-radius: var(--radius-sm); padding: 10px; margin-top: 6px; overflow-x: auto; white-space: pre; max-height: 200px; overflow-y: auto; color: var(--text2); }
+  .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .actions .btn { flex: 1; }
+  .key-note { font-size: 12px; color: var(--text3); margin-top: 6px; }
+  .card-toggle { cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; }
+  .card-toggle .chevron { font-size: 13px; color: var(--text3); transition: transform 0.2s; }
+  .card-toggle.open .chevron { transform: rotate(180deg); }
+  .card-body { margin-top: 0; overflow: hidden; }
+  .card-body.collapsed { display: none; }
+
+  /* Resumo scenario cards */
+  .resumo-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .resumo-card:hover { border-color: var(--border-md); }
+  .resumo-card.resumo-selected { border: 1.5px solid var(--info-border); background: var(--blue-bg); }
+  .resumo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .resumo-label { display: flex; align-items: center; gap: 8px; }
+  .resumo-icon { font-size: 16px; }
+  .resumo-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text2); }
+  .resumo-selected .resumo-title { color: var(--blue-text); }
+  .resumo-expand-btn { font-size: 12px; color: var(--text3); cursor: pointer; }
+  .resumo-expand-btn:hover { color: var(--text2); }
+  .resumo-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 99px; background: var(--surface2); color: var(--text); border: 0.5px solid var(--border); }
+  .pill-hi { background: var(--text); color: var(--bg); border-color: transparent; }
+  .resumo-actions { margin-top: 10px; display: flex; gap: 8px; }
+  .resumo-detail { margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Calculadora de Vale-Transporte</h1>
+  <p class="subtitle">Calcule o custo de transporte por CEP usando o Google Maps</p>
+
+  <div class="card">
+    <div class="card-title">⚙ Configuração</div>
+    <div class="field">
+      <label>Chave da API do Google Maps</label>
+      <input type="password" id="api-key" placeholder="AIzaSy..." />
+      <span class="key-note">Necessário: Maps JavaScript API + Directions API ativadas no Google Cloud</span>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>CEP da empresa</label><input type="text" id="cep-emp" placeholder="06455-020" maxlength="9" value="06455-020" /></div>
+      <div class="field"><label>Horário de chegada</label><input type="time" id="h-chegada" value="08:00" /></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>CEP do funcionário</label><input type="text" id="cep-func" placeholder="06532-014" maxlength="9" /></div>
+      <div class="field"><label>Horário de saída</label><input type="time" id="h-saida" value="18:00" /></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Dias úteis no mês</label><input type="number" id="dias" value="22" min="1" max="31" /></div>
+    </div>
+    <button class="btn btn-primary" id="btn-buscar" onclick="iniciar()">
+      ↗ Buscar rotas
+    </button>
+  </div>
+
+  <div id="sec-resumos"></div>
+
+  <div class="card hidden" id="sec-ida">
+    <div class="card-title card-toggle" id="toggle-ida" onclick="toggleSection('ida')">
+      <span>→ Ida — funcionário → empresa</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-body collapsed" id="body-ida">
+      <div id="status-ida"></div>
+      <div id="rotas-ida"></div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="sec-volta">
+    <div class="card-title card-toggle" id="toggle-volta" onclick="toggleSection('volta')">
+      <span>← Volta — empresa → funcionário</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-body collapsed" id="body-volta">
+      <div id="status-volta"></div>
+      <div id="rotas-volta"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = { rotasIda: [], rotasVolta: [], selCenario: null, dias: 22 };
+
+function maskCep(v){ return v.replace(/\D/g,'').replace(/^(\d{5})(\d)/,'$1-$2').slice(0,9); }
+document.getElementById('cep-emp').addEventListener('input', e => e.target.value = maskCep(e.target.value));
+document.getElementById('cep-func').addEventListener('input', e => e.target.value = maskCep(e.target.value));
+
+function nextWeekday(hhmm, offsetDays=1){
+  const [h,m] = hhmm.split(':').map(Number);
+  const d = new Date(); d.setDate(d.getDate()+offsetDays); d.setHours(h,m,0,0);
+  return d;
+}
+
+let sdkLoaded = false;
+function loadSDK(key){
+  return new Promise((res, rej) => {
+    if(sdkLoaded && window.google && window.google.maps){ res(); return; }
+    const old = document.getElementById('gmaps-sdk');
+    if(old) old.remove();
+    window.__gmapsCallback = () => { sdkLoaded = true; res(); };
+    const s = document.createElement('script');
+    s.id = 'gmaps-sdk';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&callback=__gmapsCallback&language=pt-BR&region=BR`;
+    s.async = true; s.defer = true;
+    s.onerror = () => rej(new Error('Falha ao carregar SDK. Verifique a chave e se a Maps JavaScript API está ativada.'));
+    document.head.appendChild(s);
+  });
+}
+
+function directionsRequest(origin, dest, arrivalTime){
+  return new Promise((res, rej) => {
+    const svc = new google.maps.DirectionsService();
+    svc.route({
+      origin, destination: dest,
+      travelMode: google.maps.TravelMode.TRANSIT,
+      transitOptions: { arrivalTime },
+      provideRouteAlternatives: true,
+      region: 'BR'
+    }, (result, status) => {
+      if(status === 'OK') res(result);
+      else rej(new Error(`Directions API retornou: ${status}`));
+    });
+  });
+}
+
+async function iniciar(){
+  const key = document.getElementById('api-key').value.trim();
+  const cepEmp = document.getElementById('cep-emp').value.replace(/\D/g,'');
+  const cepFunc = document.getElementById('cep-func').value.replace(/\D/g,'');
+  if(!key){ alert('Informe a chave da API.'); return; }
+  if(cepEmp.length<8||cepFunc.length<8){ alert('Informe os dois CEPs corretamente.'); return; }
+
+  const btn = document.getElementById('btn-buscar');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Carregando SDK...';
+
+  document.getElementById('sec-resumos').innerHTML='<div class="card"><p style="color:var(--text2);font-size:13px"><span class="spinner"></span>Buscando rotas...</p></div>';
+  document.getElementById('sec-ida').classList.add('hidden');
+  document.getElementById('sec-volta').classList.add('hidden');
+  document.getElementById('rotas-ida').innerHTML='';
+  document.getElementById('rotas-volta').innerHTML='';
+  S.rotasIda=[]; S.rotasVolta=[]; S.selCenario=null;
+
+  try {
+    await loadSDK(key);
+    btn.innerHTML='<span class="spinner"></span>Buscando rotas...';
+    S.dias = parseInt(document.getElementById('dias').value)||22;
+
+    const chegada = nextWeekday(document.getElementById('h-chegada').value, 1);
+    const saida   = nextWeekday(document.getElementById('h-saida').value, 1);
+
+    const [dataIda, dataVolta] = await Promise.all([
+      directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada),
+      directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida)
+    ]);
+
+    // Store all routes (up to 4 each)
+    S.rotasIda  = (dataIda.routes||[]).slice(0,4);
+    S.rotasVolta = (dataVolta.routes||[]).slice(0,4);
+
+    buildCenarios();
+
+    // Render detail sections (sorted by fare, collapsed)
+    renderRotas('ida', dataIda);
+    renderRotas('volta', dataVolta);
+    document.getElementById('sec-ida').classList.remove('hidden');
+    document.getElementById('sec-volta').classList.remove('hidden');
+
+  } catch(err){
+    document.getElementById('sec-resumos').innerHTML=`<div class="card"><div class="alert alert-err">⚠ ${err.message}</div></div>`;
+  }
+
+  btn.disabled=false; btn.innerHTML='↗ Buscar rotas';
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function parseLinhas(rota){
+  const out=[];
+  for(const leg of rota.legs||[]){
+    for(const step of leg.steps||[]){
+      if(step.travel_mode==='TRANSIT' && step.transit){
+        const t=step.transit;
+        out.push({ nome: t.line?.short_name||t.line?.name||'?', tipo: t.line?.vehicle?.type||'BUS' });
+      }
+    }
+  }
+  return out;
+}
+
+function countConducoes(rota){
+  let n=0;
+  for(const leg of rota.legs||[])
+    for(const step of leg.steps||[])
+      if(step.travel_mode==='TRANSIT') n++;
+  return n;
+}
+
+function getDuration(rota){ return rota.legs?.[0]?.duration?.value ?? Infinity; }
+function getDurationText(rota){ return rota.legs?.[0]?.duration?.text ?? '--'; }
+
+function getSaved(k){ try{ return JSON.parse(localStorage.getItem('vt_fares')||'{}')[k]||''; }catch(e){return '';} }
+function setSaved(k,v){ try{ const f=JSON.parse(localStorage.getItem('vt_fares')||'{}'); f[k]=v; localStorage.setItem('vt_fares',JSON.stringify(f)); }catch(e){} }
+function brl(v){ return v.toFixed(2).replace('.',','); }
+
+function getFareEstimate(rota){
+  if(rota.fare?.value != null) return rota.fare.value;
+  const linhas = parseLinhas(rota);
+  const sk = linhas.map(l=>l.nome).sort().join('|');
+  const saved = getSaved(sk);
+  return saved ? parseFloat(saved) : Infinity;
+}
+
+// Key to identify a route pair (for dedup)
+function pairKey(idaIdx, voltaIdx){ return `${idaIdx}:${voltaIdx}`; }
+
+// Find best ida index by comparator
+function bestIdx(rotas, fn){
+  let best=0;
+  for(let i=1;i<rotas.length;i++) if(fn(rotas[i])<fn(rotas[best])) best=i;
+  return best;
+}
+
+// ─── cenários ─────────────────────────────────────────────────────────────────
+
+function buildCenarios(){
+  const ri = S.rotasIda, rv = S.rotasVolta;
+  if(!ri.length || !rv.length){ document.getElementById('sec-resumos').innerHTML='<div class="card"><div class="alert alert-err">⚠ Nenhuma rota encontrada.</div></div>'; return; }
+
+  const defs = [
+    { id:'barata',    label:'Mais barata',         icon:'💰', fn: getFareEstimate },
+    { id:'rapida',    label:'Mais rápida',          icon:'⚡', fn: getDuration },
+    { id:'conducoes', label:'Menos conduções',      icon:'🔀', fn: countConducoes },
+  ];
+
+  const cenarios = [];
+  const usedKeys = new Set();
+
+  for(const def of defs){
+    const idaIdx   = bestIdx(ri, def.fn);
+    const voltaIdx = bestIdx(rv, def.fn);
+    const key = pairKey(idaIdx, voltaIdx);
+    if(usedKeys.has(key)) continue; // duplicate — skip
+    usedKeys.add(key);
+    cenarios.push({ ...def, idaIdx, voltaIdx });
+  }
+
+  S.cenarios = cenarios;
+  renderCenarios();
+  selectCenario(0);
+}
+
+function renderCenarios(){
+  const el = document.getElementById('sec-resumos');
+  el.innerHTML = S.cenarios.map((c,i) => `
+    <div class="resumo-card" id="resumo-${i}" onclick="selectCenario(${i})">
+      <div class="resumo-header">
+        <div class="resumo-label">
+          <span class="resumo-icon">${c.icon}</span>
+          <span class="resumo-title">${c.label}</span>
+        </div>
+        <div class="resumo-chevron-wrap">
+          <span class="resumo-expand-btn" id="expand-btn-${i}" onclick="event.stopPropagation();expandCenario(${i})">ver detalhes ▾</span>
+        </div>
+      </div>
+      <div class="resumo-pills" id="resumo-pills-${i}"></div>
+      <div class="resumo-detail hidden" id="resumo-detail-${i}"></div>
+      <div class="resumo-actions hidden" id="resumo-actions-${i}">
+        <button class="btn btn-sm" onclick="event.stopPropagation();copiarCenario(${i})">⎘ Copiar resumo</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectCenario(idx){
+  S.selCenario = idx;
+  const c = S.cenarios[idx];
+
+  // Update resumo cards visual state
+  S.cenarios.forEach((_,i)=>{
+    document.getElementById(`resumo-${i}`)?.classList.toggle('resumo-selected', i===idx);
+  });
+
+  // Update pills for all cards
+  S.cenarios.forEach((_,i) => fillPills(i));
+
+  // Sync detail route cards
+  selRoute('ida',   c.idaIdx);
+  selRoute('volta', c.voltaIdx);
+
+  // Update toggle labels
+  const fIda   = getFareEstimate(S.rotasIda[c.idaIdx]);
+  const fVolta = getFareEstimate(S.rotasVolta[c.voltaIdx]);
+  const tIda   = document.getElementById('toggle-ida');
+  const tVolta = document.getElementById('toggle-volta');
+  if(tIda)   tIda.querySelector('span').textContent   = `→ Ida${fIda<Infinity?' — R$ '+brl(fIda):''}`;
+  if(tVolta) tVolta.querySelector('span').textContent = `← Volta${fVolta<Infinity?' — R$ '+brl(fVolta):''}`;
+
+  // Refresh detail panel if expanded
+  const det = document.getElementById(`resumo-detail-${idx}`);
+  if(det && !det.classList.contains('hidden')) fillDetail(idx);
+}
+
+function fillPills(i){
+  const c = S.cenarios[i];
+  const selected = i === S.selCenario;
+  const ri = S.rotasIda[c.idaIdx];
+  const rv = S.rotasVolta[c.voltaIdx];
+  const fIda   = getFareEstimate(ri);
+  const fVolta = getFareEstimate(rv);
+  const totalFare = (fIda<Infinity&&fVolta<Infinity) ? fIda+fVolta : null;
+  const totalSec  = getDuration(ri)+getDuration(rv);
+  const totalCond = countConducoes(ri)+countConducoes(rv);
+  const dias = S.dias;
+
+  const pillEl = document.getElementById(`resumo-pills-${i}`);
+  if(!pillEl) return;
+  pillEl.innerHTML = `
+    <span class="pill ${selected?'pill-hi':''}">
+      ${totalFare!==null ? `R$ ${brl(totalFare)}/dia · R$ ${brl(totalFare*dias)}/mês` : '⚠ tarifa não disponível'}
+    </span>
+    <span class="pill">${formatSeconds(totalSec)} total</span>
+    <span class="pill">${totalCond} ${totalCond===1?'condução':'conduções'}</span>
+  `;
+}
+
+function formatSeconds(s){
+  if(s===Infinity||isNaN(s)) return '--';
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  return h>0 ? `${h}h${m.toString().padStart(2,'0')}min` : `${m}min`;
+}
+
+function expandCenario(idx){
+  const det = document.getElementById(`resumo-detail-${idx}`);
+  const act = document.getElementById(`resumo-actions-${idx}`);
+  const btn = document.getElementById(`expand-btn-${idx}`);
+  const isHidden = det.classList.contains('hidden');
+  det.classList.toggle('hidden', !isHidden);
+  act.classList.toggle('hidden', !isHidden);
+  btn.textContent = isHidden ? 'ocultar ▴' : 'ver detalhes ▾';
+  if(isHidden) fillDetail(idx);
+  if(isHidden) selectCenario(idx);
+}
+
+function fillDetail(idx){
+  const c = S.cenarios[idx];
+  const ri = S.rotasIda[c.idaIdx];
+  const rv = S.rotasVolta[c.voltaIdx];
+  const fIda   = getFareEstimate(ri);
+  const fVolta = getFareEstimate(rv);
+  const dias = S.dias;
+  const total = (fIda<Infinity&&fVolta<Infinity) ? (fIda+fVolta)*dias : null;
+
+  const linhasIda   = parseLinhas(ri);
+  const linhasVolta = parseLinhas(rv);
+  const map={};
+  linhasIda.forEach(l=>{   if(!map[l.nome]) map[l.nome]={nome:l.nome,tipo:l.tipo,dirs:[]}; map[l.nome].dirs.push('ida'); });
+  linhasVolta.forEach(l=>{ if(!map[l.nome]) map[l.nome]={nome:l.nome,tipo:l.tipo,dirs:[]}; map[l.nome].dirs.push('volta'); });
+  const allLinhas = Object.values(map);
+  const totalUnits = allLinhas.reduce((s,l)=>s+l.dirs.length,0);
+  const fareUnit = totalUnits>0&&total!==null ? (fIda+fVolta)/totalUnits : 0;
+
+  const vehicleLabel={BUS:'Ônibus',SUBWAY:'Metrô',RAIL:'Trem',TRAM:'VLT',FERRY:'Balsa'};
+  const vehicleIcon={BUS:'🚌',SUBWAY:'🚊',RAIL:'🚆',TRAM:'🚋',FERRY:'⛴'};
+
+  const linesHtml = allLinhas.map(l=>{
+    const tags=l.dirs.map(d=>`<span class="tag tag-${d}">${d}</span>`).join('');
+    return `<tr>
+      <td><div style="font-weight:500">${l.nome}${tags}</div>
+          <div style="font-size:12px;color:var(--text2)">${vehicleIcon[l.tipo]||'🚌'} ${vehicleLabel[l.tipo]||l.tipo}</div></td>
+      <td style="color:var(--text2)">${l.dirs.length}× R$\u00a0${brl(fareUnit)}</td>
+      <td>R$\u00a0${brl(fareUnit*l.dirs.length)}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="3" style="color:var(--text2)">Nenhuma linha identificada</td></tr>';
+
+  document.getElementById(`resumo-detail-${idx}`).innerHTML = `
+    <div class="divider"></div>
+    <div class="metric-grid">
+      <div class="metric"><div class="metric-label">Tarifa ida</div><div class="metric-value">${fIda<Infinity?'R$ '+brl(fIda):'–'}</div></div>
+      <div class="metric"><div class="metric-label">Tarifa volta</div><div class="metric-value">${fVolta<Infinity?'R$ '+brl(fVolta):'–'}</div></div>
+      <div class="metric"><div class="metric-label">Total por dia</div><div class="metric-value">${fIda<Infinity&&fVolta<Infinity?'R$ '+brl(fIda+fVolta):'–'}</div></div>
+      <div class="metric"><div class="metric-label">Total mês (${dias}d)</div><div class="metric-value">${total!==null?'R$ '+brl(total):'–'}</div></div>
+    </div>
+    <div class="divider"></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Detalhamento por linha</p>
+    <table class="lines-table">
+      <thead><tr>
+        <td style="color:var(--text2);font-size:12px;padding-bottom:6px">Linha</td>
+        <td style="color:var(--text2);font-size:12px;padding-bottom:6px">Qtd × valor</td>
+        <td style="color:var(--text2);font-size:12px;padding-bottom:6px;text-align:right">Subtotal</td>
+      </tr></thead>
+      <tbody>${linesHtml}</tbody>
+    </table>
+  `;
+
+  // Store for copy
+  c._summary = { fIda, fVolta, total, dias, allLinhas, fareUnit };
+}
+
+function copiarCenario(idx){
+  const c = S.cenarios[idx];
+  if(!c._summary) fillDetail(idx);
+  const s = c._summary;
+  const linhas = s.allLinhas.map(l=>`  ${l.nome}: ${l.dirs.length}x R$ ${s.brl(fareUnit)} = R$ ${brl(s.fareUnit*l.dirs.length)}`).join('\n');
+  const txt = `Vale-transporte (${c.label})\nIda: R$ ${s.brl(fIda)} | Volta: R$ ${s.brl(fVolta)}\n\nLinhas:\n${linhas}\n\nTotal/dia: R$ ${brl(s.fIda+s.fVolta)}\nTotal/mês (${s.dias} dias): R$ ${s.total!=null?brl(s.total):'–'||'–'}`;
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b = document.getElementById(`resumo-actions-${idx}`)?.querySelector('button');
+    if(b){ b.textContent='✓ Copiado!'; setTimeout(()=>b.textContent='⎘ Copiar resumo',2000); }
+  });
+}
+
+// ─── detail route cards ───────────────────────────────────────────────────────
+
+function renderRotas(dir, data){
+  const statusEl=document.getElementById(`status-${dir}`);
+  const rotasEl=document.getElementById(`rotas-${dir}`);
+  const rotas=data.routes||[];
+  if(!rotas.length){ statusEl.innerHTML=`<div class="alert alert-err">⚠ Nenhuma rota encontrada.</div>`; return; }
+
+  const comTarifa=rotas.filter(r=>r.fare).length;
+  statusEl.innerHTML = comTarifa>0
+    ? `<div class="alert alert-ok" style="margin-bottom:10px">✓ API retornou tarifas em ${comTarifa} de ${rotas.length} rota(s)</div>`
+    : `<div class="alert alert-warn" style="margin-bottom:10px">⚠ API não retornou tarifas — informe o valor manualmente</div>`;
+
+  const lista = rotas.slice(0,4).sort((a,b)=>getFareEstimate(a)-getFareEstimate(b));
+  // Store sorted list back so cenario indices still map correctly — but cenarios were built before sort, so we need to keep original order for cenarios and use a display index for cards
+  // Use data-routeidx to track the original position in S.rotasIda/Volta
+  const originalList = dir==='ida' ? S.rotasIda : S.rotasVolta;
+
+  lista.forEach((rota,displayIdx)=>{
+    const origIdx = originalList.indexOf(rota);
+    const leg=rota.legs[0];
+    const dep=leg.departure_time?.text||'--';
+    const arr=leg.arrival_time?.text||'--';
+    const dur=leg.duration?.text||'';
+    const linhas=parseLinhas(rota);
+    const fareVal=rota.fare?.value??null;
+    const fareText=rota.fare?.text??null;
+
+    const card=document.createElement('div');
+    card.className='route-card';
+    card.id=`card-${dir}-${origIdx}`;
+    card.dataset.origIdx=origIdx;
+    card.dataset.linhas=JSON.stringify(linhas);
+    card.dataset.fareAuto=fareVal!==null?fareVal:'';
+
+    const stepsHtml=linhas.length
+      ? linhas.map(l=>`<span class="badge transit">${l.tipo==='SUBWAY'||l.tipo==='RAIL'?'🚊':'🚌'} ${l.nome}</span>`).join('')
+      : '<span class="badge">🚶 Caminhada</span>';
+
+    let fareHtml='';
+    if(fareVal!==null){
+      fareHtml=`<div class="fare-row"><label>Tarifa retornada pela API</label><span class="fare-auto">${fareText||'R$ '+brl(fareVal)}</span></div>`;
+    } else {
+      const sk=linhas.map(l=>l.nome).sort().join('|');
+      const sv=getSaved(sk);
+      fareHtml=`<div class="fare-row"><label>Tarifa total (informe)</label><input class="fare-input" type="number" step="0.01" min="0" placeholder="0,00" value="${sv||''}" id="fare-${dir}-${origIdx}" oninput="onFareInput('${dir}',${origIdx})" /></div>`;
+      card.dataset.fareKey=sk;
+    }
+
+    card.innerHTML=`
+      <div class="route-header">
+        <span class="route-time">${dep} → ${arr}</span>
+        <span class="route-dur">⏱ ${dur}</span>
+      </div>
+      <div class="steps">${stepsHtml}</div>
+      ${fareHtml}
+    `;
+    card.addEventListener('click',e=>{ e.stopPropagation(); }); // somente informativo
+
+    const rawToggle=document.createElement('span');
+    rawToggle.className='raw-toggle';
+    rawToggle.textContent='ver dados brutos da API';
+    rawToggle.addEventListener('click',e=>{
+      e.stopPropagation();
+      const ex=card.querySelector('.raw-box');
+      if(ex){ ex.remove(); rawToggle.textContent='ver dados brutos da API'; return; }
+      rawToggle.textContent='ocultar dados brutos';
+      const box=document.createElement('div');
+      box.className='raw-box';
+      box.textContent=JSON.stringify({
+        fare: rota.fare||null,
+        duration: leg.duration,
+        departure_time: leg.departure_time,
+        arrival_time: leg.arrival_time,
+        transit_steps: leg.steps?.filter(s=>s.travel_mode==='TRANSIT').map(s=>({
+          line: s.transit?.line?.short_name||s.transit?.line?.name,
+          vehicle: s.transit?.line?.vehicle?.type,
+          from: s.transit?.departure_stop?.name,
+          to: s.transit?.arrival_stop?.name,
+          num_stops: s.transit?.num_stops
+        }))
+      },null,2);
+      card.appendChild(box);
+    });
+    card.appendChild(rawToggle);
+    rotasEl.appendChild(card);
+  });
+}
+
+function selRoute(dir, origIdx){
+  document.querySelectorAll(`[id^="card-${dir}-"]`).forEach(c=>{
+    c.classList.toggle('selected', parseInt(c.dataset.origIdx)===origIdx);
+  });
+  if(dir==='ida') S.selIda=origIdx; else S.selVolta=origIdx;
+}
+
+function onFareInput(dir, origIdx){
+  const card = document.getElementById(`card-${dir}-${origIdx}`);
+  const inp  = document.getElementById(`fare-${dir}-${origIdx}`);
+  const v = parseFloat(inp?.value)||0;
+  if(v>0 && card?.dataset.fareKey) setSaved(card.dataset.fareKey, v);
+  // Refresh any expanded scenario detail
+  if(S.selCenario!==null) fillPills(S.selCenario);
+  const det = document.getElementById(`resumo-detail-${S.selCenario}`);
+  if(det && !det.classList.contains('hidden')) fillDetail(S.selCenario);
+}
+
+function toggleSection(dir){
+  const body = document.getElementById(`body-${dir}`);
+  const toggle = document.getElementById(`toggle-${dir}`);
+  const collapsed = body.classList.toggle('collapsed');
+  toggle.classList.toggle('open', !collapsed);
+}
+
+document.getElementById('dias').addEventListener('input', () => {
+  S.dias = parseInt(document.getElementById('dias').value)||22;
+  if(S.cenarios) S.cenarios.forEach((_,i)=>{ fillPills(i); const det=document.getElementById(`resumo-detail-${i}`); if(det&&!det.classList.contains('hidden')) fillDetail(i); });
+});
+</script>
+</body>
+</html>
