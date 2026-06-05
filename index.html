@@ -229,16 +229,13 @@ function loadSDK(key){
   });
 }
 
-function directionsRequest(origin, dest, time, mode='arrival'){
+function directionsRequest(origin, dest, arrivalTime){
   return new Promise((res, rej) => {
     const svc = new google.maps.DirectionsService();
-    const transitOptions = mode === 'departure'
-      ? { departureTime: time }
-      : { arrivalTime: time };
     svc.route({
       origin, destination: dest,
       travelMode: google.maps.TravelMode.TRANSIT,
-      transitOptions,
+      transitOptions: { arrivalTime },
       provideRouteAlternatives: true,
       region: 'BR'
     }, (result, status) => {
@@ -274,8 +271,8 @@ async function iniciar(){
     const saida   = nextWeekday(document.getElementById('h-saida').value, 1);
 
     const [dataIda, dataVolta] = await Promise.all([
-      directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada, 'arrival'),
-      directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida,   'departure')
+      directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada),
+      directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida)
     ]);
 
     // Store all routes
@@ -327,12 +324,72 @@ function getSaved(k){ try{ return JSON.parse(localStorage.getItem('vt_fares')||'
 function setSaved(k,v){ try{ const f=JSON.parse(localStorage.getItem('vt_fares')||'{}'); f[k]=v; localStorage.setItem('vt_fares',JSON.stringify(f)); }catch(e){} }
 function brl(v){ return v.toFixed(2).replace('.',','); }
 
+// ─── Tabela de tarifas SP — vigência 06/01/2026 ───────────────────────────────
+// Fontes: Portaria SMT.GAB nº 005/2026 (ônibus municipal), ARTESP/Metrô/CPTM jan/2026
+const TARIFAS_SP = {
+  // Ônibus municipal SPTrans (Bilhete Único VT corporativo)
+  BUS_MUNICIPAL:      5.82,
+  // Ônibus municipal SPTrans (Bilhete Único comum / pessoa física)
+  BUS_MUNICIPAL_COMUM: 5.30,
+  // Metrô, CPTM, ViaMobilidade (todas as linhas sobre trilhos)
+  METRO_CPTM:         5.40,
+  // Ônibus intermunicipal metropolitano ARTESP (ex-EMTU) — tarifa comum mínima
+  // Varia por extensão (R$ 4,15–R$ 12,00); usamos piso conservador para estimativa
+  BUS_INTERMUNICIPAL: 6.35,  // valor do Corredor ABD / referência metropolitana
+  // Integração ônibus + metrô/trem (Bilhete Único VT corporativo, 3h)
+  INTEGRACAO_ONIBUS_METRO: 11.32,
+  // Integração ônibus + metrô/trem (Bilhete Único comum)
+  INTEGRACAO_ONIBUS_METRO_COMUM: 9.38,
+};
+
+// Detecta o tipo predominante de modal em uma rota e estima a tarifa VT
+function estimarTarifaPorModal(linhas) {
+  if (!linhas.length) return null;
+
+  const tipos = linhas.map(l => l.tipo);
+  const temTrilho = tipos.some(t => t === 'SUBWAY' || t === 'RAIL' || t === 'TRAM');
+  const temOnibus = tipos.some(t => t === 'BUS');
+
+  // Integração: tem ônibus E trilho na mesma rota
+  if (temOnibus && temTrilho) return TARIFAS_SP.INTEGRACAO_ONIBUS_METRO;
+
+  // Só trilho (metrô / CPTM / VLT)
+  if (temTrilho) return TARIFAS_SP.METRO_CPTM;
+
+  // Só ônibus — tenta distinguir municipal de intermunicipal pelo prefixo da linha
+  // Linhas municipais SPTrans: padrão numérico (ex: 8012-10, 107P-10)
+  // Linhas intermunicipais ARTESP: geralmente 3–4 dígitos sem hífen ou com prefixo de cidade
+  if (temOnibus) {
+    const algumIntermunicipal = linhas.some(l => {
+      const nome = l.nome || '';
+      return /^[A-Z]{2,}/.test(nome) || nome.length <= 3;
+    });
+    return algumIntermunicipal ? TARIFAS_SP.BUS_INTERMUNICIPAL : TARIFAS_SP.BUS_MUNICIPAL;
+  }
+
+  return null;
+}
+
 function getFareEstimate(rota){
   if(rota.fare?.value != null) return rota.fare.value;
   const linhas = parseLinhas(rota);
   const sk = linhas.map(l=>l.nome).sort().join('|');
+  // 1) Valor salvo manualmente pelo usuário tem prioridade
   const saved = getSaved(sk);
-  return saved ? parseFloat(saved) : Infinity;
+  if (saved) return parseFloat(saved);
+  // 2) Estimativa automática pela tabela de tarifas SP 2026
+  const estimado = estimarTarifaPorModal(linhas);
+  if (estimado !== null) return estimado;
+  return Infinity;
+}
+
+// Retorna true se a tarifa veio da tabela automática (não da API nem do usuário)
+function fareIsEstimated(rota){
+  if(rota.fare?.value != null) return false;
+  const linhas = parseLinhas(rota);
+  const sk = linhas.map(l=>l.nome).sort().join('|');
+  if(getSaved(sk)) return false;
+  return estimarTarifaPorModal(linhas) !== null;
 }
 
 // Key to identify a route pair (for dedup)
@@ -542,9 +599,14 @@ function renderRotas(dir, data){
   if(!rotas.length){ statusEl.innerHTML=`<div class="alert alert-err">⚠ Nenhuma rota encontrada.</div>`; return; }
 
   const comTarifa=rotas.filter(r=>r.fare).length;
-  statusEl.innerHTML = comTarifa>0
-    ? `<div class="alert alert-ok" style="margin-bottom:10px">✓ API retornou tarifas em ${comTarifa} de ${rotas.length} rota(s)</div>`
-    : `<div class="alert alert-warn" style="margin-bottom:10px">⚠ API não retornou tarifas — informe o valor manualmente</div>`;
+  const comEstimativa=rotas.filter(r=>!r.fare && estimarTarifaPorModal(parseLinhas(r))!==null).length;
+  if(comTarifa>0){
+    statusEl.innerHTML=`<div class="alert alert-ok" style="margin-bottom:10px">✓ API retornou tarifas em ${comTarifa} de ${rotas.length} rota(s)</div>`;
+  } else if(comEstimativa>0){
+    statusEl.innerHTML=`<div class="alert alert-info" style="margin-bottom:10px">ℹ API não retornou tarifas — valores estimados pela tabela SP 2026. Edite se necessário.</div>`;
+  } else {
+    statusEl.innerHTML=`<div class="alert alert-warn" style="margin-bottom:10px">⚠ API não retornou tarifas — informe o valor manualmente</div>`;
+  }
 
   const lista = rotas.slice(0,6).sort((a,b)=>getFareEstimate(a)-getFareEstimate(b));
   // Store sorted list back so cenario indices still map correctly — but cenarios were built before sort, so we need to keep original order for cenarios and use a display index for cards
@@ -578,8 +640,19 @@ function renderRotas(dir, data){
     } else {
       const sk=linhas.map(l=>l.nome).sort().join('|');
       const sv=getSaved(sk);
-      fareHtml=`<div class="fare-row"><label>Tarifa total (informe)</label><input class="fare-input" type="number" step="0.01" min="0" placeholder="0,00" value="${sv||''}" id="fare-${dir}-${origIdx}" oninput="onFareInput('${dir}',${origIdx})" /></div>`;
+      const est=estimarTarifaPorModal(linhas);
       card.dataset.fareKey=sk;
+      if(est!==null && !sv){
+        fareHtml=`<div class="fare-row">
+          <label style="flex:1">Estimado <span style="font-size:11px;background:var(--amber-bg);color:var(--amber-text);padding:1px 6px;border-radius:99px;margin-left:4px">tabela SP 2026</span></label>
+          <input class="fare-input" type="number" step="0.01" min="0" placeholder="0,00" value="${est.toFixed(2)}" id="fare-${dir}-${origIdx}" oninput="onFareInput('${dir}',${origIdx})" />
+        </div>`;
+      } else {
+        fareHtml=`<div class="fare-row">
+          <label>${sv ? 'Tarifa informada manualmente' : 'Tarifa total (informe)'}</label>
+          <input class="fare-input" type="number" step="0.01" min="0" placeholder="0,00" value="${sv||''}" id="fare-${dir}-${origIdx}" oninput="onFareInput('${dir}',${origIdx})" />
+        </div>`;
+      }
     }
 
     card.innerHTML=`
@@ -652,5 +725,9 @@ document.getElementById('dias').addEventListener('input', () => {
   if(S.cenarios) S.cenarios.forEach((_,i)=>{ fillPills(i); const det=document.getElementById(`resumo-detail-${i}`); if(det&&!det.classList.contains('hidden')) fillDetail(i); });
 });
 </script>
+<p style="text-align:center;font-size:11px;color:var(--text3);padding:0 1rem 2rem">
+  Estimativas baseadas na tabela SP vigente desde 06/01/2026 —
+  ônibus municipal R$&nbsp;5,82&nbsp;(VT) · metrô/CPTM R$&nbsp;5,40 · intermunicipal R$&nbsp;6,35+
+</p>
 </body>
 </html>
