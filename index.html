@@ -124,6 +124,60 @@
   .card-body { margin-top: 0; overflow: hidden; }
   .card-body.collapsed { display: none; }
 
+  /* ── Batch processing ── */
+  .batch-drop-zone {
+    border: 1.5px dashed var(--border-md); border-radius: var(--radius-sm);
+    padding: 2rem 1rem; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--surface2);
+  }
+  .batch-drop-zone:hover, .batch-drop-zone.drag-over {
+    border-color: var(--info-border); background: var(--blue-bg);
+  }
+  .batch-drop-icon { font-size: 28px; margin-bottom: 8px; }
+  .batch-drop-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .batch-drop-sub { font-size: 12px; color: var(--text3); }
+  .batch-drop-sub a { color: var(--info-border); text-decoration: underline; cursor: pointer; }
+  #batch-file-input { display: none; }
+  .batch-preview {
+    border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    overflow: hidden; margin-top: 10px;
+  }
+  .batch-preview-header {
+    display: grid; grid-template-columns: 80px 1fr 1fr 1fr;
+    gap: 0; background: var(--surface2);
+    border-bottom: 0.5px solid var(--border);
+    font-size: 11px; font-weight: 600; color: var(--text2);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .batch-preview-header div, .batch-row div { padding: 7px 12px; }
+  .batch-row {
+    display: grid; grid-template-columns: 80px 1fr 1fr 1fr;
+    border-bottom: 0.5px solid var(--border); font-size: 13px;
+    transition: background 0.1s;
+  }
+  .batch-row:last-child { border-bottom: none; }
+  .batch-row.processing { background: var(--blue-bg); }
+  .batch-row.done { }
+  .batch-row.error { background: var(--red-bg); }
+  .batch-status { font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 5px; }
+  .batch-status.ok { color: var(--green-text); }
+  .batch-status.err { color: var(--red-text); }
+  .batch-status.running { color: var(--blue-text); }
+  .progress-bar-wrap {
+    background: var(--surface2); border-radius: 99px;
+    height: 6px; overflow: hidden; margin: 10px 0;
+  }
+  .progress-bar-fill {
+    height: 100%; background: var(--info-border);
+    border-radius: 99px; transition: width 0.3s ease;
+    width: 0%;
+  }
+  .batch-summary { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+  .batch-sum-item { padding: 3px 10px; border-radius: 99px; background: var(--surface2); border: 0.5px solid var(--border); color: var(--text2); }
+  .batch-sum-item.ok { background: var(--green-bg); color: var(--green-text); border-color: transparent; }
+  .batch-sum-item.err { background: var(--red-bg); color: var(--red-text); border-color: transparent; }
+
   /* Resumo scenario cards */
   .resumo-card {
     background: var(--surface); border: 0.5px solid var(--border);
@@ -176,6 +230,54 @@
   </div>
 
   <div id="sec-resumos"></div>
+
+  <!-- ── Lote ── -->
+  <div class="card" id="sec-lote">
+    <div class="card-title card-toggle" id="toggle-lote" onclick="toggleLote()">
+      <span>📋 Processamento em lote (CSV)</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-body collapsed" id="body-lote">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+        Importe um CSV com os funcionários e obtenha uma planilha com as tarifas calculadas.
+        A chave da API e o CEP da empresa acima serão usados para todos.
+      </p>
+
+      <!-- formato esperado -->
+      <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+        <strong>Formato do CSV:</strong> colunas <code style="background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:4px">codigo</code> e <code style="background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:4px">cep</code> (separador: vírgula ou ponto-e-vírgula). Linhas de cabeçalho são detectadas automaticamente.
+        <br><span style="opacity:.7;margin-top:4px;display:block">Exemplo: <code style="background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:4px">001;06532-014</code></span>
+      </div>
+
+      <!-- drop zone -->
+      <div class="batch-drop-zone" id="batch-drop" onclick="document.getElementById('batch-file-input').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <div class="batch-drop-icon">📂</div>
+        <div class="batch-drop-title">Arraste o CSV aqui ou clique para selecionar</div>
+        <div class="batch-drop-sub">Suporte a .csv com separador , ou ;</div>
+      </div>
+      <input type="file" id="batch-file-input" accept=".csv,text/csv" onchange="onBatchFile(event)" />
+
+      <!-- preview / tabela -->
+      <div id="batch-table-wrap" class="hidden" style="margin-top:12px"></div>
+
+      <!-- progress -->
+      <div id="batch-progress-wrap" class="hidden" style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px">
+          <span id="batch-progress-label">Aguardando...</span>
+          <span id="batch-progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="batch-bar"></div></div>
+        <div class="batch-summary" id="batch-summary"></div>
+      </div>
+
+      <!-- actions -->
+      <div id="batch-actions" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="btn-batch-run" onclick="runBatch()">▶ Calcular todos</button>
+        <button class="btn btn-sm" onclick="clearBatch()">✕ Limpar</button>
+        <button class="btn btn-sm hidden" id="btn-batch-download" onclick="downloadBatchCSV()">⬇ Baixar CSV</button>
+      </div>
+    </div>
+  </div>
 
   <div class="card hidden" id="sec-ida">
     <div class="card-title card-toggle" id="toggle-ida" onclick="toggleSection('ida')">
@@ -724,6 +826,256 @@ document.getElementById('dias').addEventListener('input', () => {
   S.dias = parseInt(document.getElementById('dias').value)||22;
   if(S.cenarios) S.cenarios.forEach((_,i)=>{ fillPills(i); const det=document.getElementById(`resumo-detail-${i}`); if(det&&!det.classList.contains('hidden')) fillDetail(i); });
 });
+
+// ──────────────────────────────────────────────────────────────
+// BATCH PROCESSING
+// ──────────────────────────────────────────────────────────────
+
+const B = { rows: [], running: false };
+
+function toggleLote(){
+  const body = document.getElementById('body-lote');
+  const toggle = document.getElementById('toggle-lote');
+  const collapsed = body.classList.toggle('collapsed');
+  toggle.classList.toggle('open', !collapsed);
+}
+
+// ── CSV parsing ──────────────────────────────────────────────
+
+function parseCsv(text){
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+  if(!lines.length) return [];
+
+  // Detect separator
+  const firstLine = lines[0];
+  const sep = firstLine.includes(';') ? ';' : ',';
+
+  // Detect header
+  const hasHeader = /[a-zA-ZçãõéêáàâíóôúüÇÃÕÉÊÁÀÂÍÓÔÚ]/.test(firstLine.split(sep)[0]);
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  return dataLines.filter(l=>l.trim()).map((line,i) => {
+    const cols = line.split(sep).map(c=>c.trim().replace(/^["']|["']$/g,''));
+    return { codigo: cols[0]||`${i+1}`, cep: cols[1]||'', tarifa_ida: '', tarifa_volta: '', total_dia: '', total_mes: '', status: 'pending', erro: '' };
+  }).filter(r => r.cep);
+}
+
+// ── Drag and drop ─────────────────────────────────────────────
+
+function onDragOver(e){ e.preventDefault(); document.getElementById('batch-drop').classList.add('drag-over'); }
+function onDragLeave(){ document.getElementById('batch-drop').classList.remove('drag-over'); }
+function onDrop(e){
+  e.preventDefault();
+  document.getElementById('batch-drop').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if(file) processBatchFile(file);
+}
+function onBatchFile(e){ const f=e.target.files[0]; if(f) processBatchFile(f); }
+
+function processBatchFile(file){
+  const reader = new FileReader();
+  reader.onload = ev => {
+    B.rows = parseCsv(ev.target.result);
+    if(!B.rows.length){ alert('Nenhum dado válido encontrado no CSV. Verifique o formato.'); return; }
+    renderBatchTable();
+    document.getElementById('batch-actions').classList.remove('hidden');
+    document.getElementById('batch-actions').style.display='flex';
+    document.getElementById('btn-batch-download').classList.add('hidden');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ── Table render ──────────────────────────────────────────────
+
+function renderBatchTable(){
+  const wrap = document.getElementById('batch-table-wrap');
+  const preview = B.rows.slice(0,200); // cap display
+
+  const rowsHtml = B.rows.map((r,i) => {
+    let statusHtml = '<span class="batch-status">—</span>';
+    if(r.status==='running')  statusHtml = `<span class="batch-status running"><span class="spinner"></span>calculando</span>`;
+    if(r.status==='done')     statusHtml = `<span class="batch-status ok">✓ R$ ${r.total_dia}/dia</span>`;
+    if(r.status==='error')    statusHtml = `<span class="batch-status err" title="${r.erro}">⚠ erro</span>`;
+
+    return `<div class="batch-row ${r.status==='running'?'processing':r.status==='done'?'done':r.status==='error'?'error':''}" id="brow-${i}">
+      <div style="font-weight:500">${r.codigo}</div>
+      <div style="font-family:monospace;font-size:12px">${r.cep}</div>
+      <div>${r.tarifa_ida ? `ida R$ ${r.tarifa_ida} · volta R$ ${r.tarifa_volta}` : ''}</div>
+      <div>${statusHtml}</div>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="batch-preview">
+      <div class="batch-preview-header">
+        <div>Código</div><div>CEP</div><div>Tarifas</div><div>Status</div>
+      </div>
+      ${rowsHtml}
+    </div>
+    ${B.rows.length > 200 ? `<p style="font-size:12px;color:var(--text3);margin-top:6px">Mostrando 200 de ${B.rows.length} linhas</p>` : ''}
+  `;
+  wrap.classList.remove('hidden');
+}
+
+function updateBatchRow(i){
+  const r = B.rows[i];
+  const el = document.getElementById(`brow-${i}`);
+  if(!el) return;
+  let statusHtml = '<span class="batch-status">—</span>';
+  if(r.status==='running')  statusHtml = `<span class="batch-status running"><span class="spinner"></span>calculando</span>`;
+  if(r.status==='done')     statusHtml = `<span class="batch-status ok">✓ R$ ${r.total_dia}/dia</span>`;
+  if(r.status==='error')    statusHtml = `<span class="batch-status err" title="${r.erro}">⚠ ${r.erro.slice(0,30)}</span>`;
+  el.className = `batch-row ${r.status==='running'?'processing':r.status==='done'?'done':r.status==='error'?'error':''}`;
+  el.children[2].textContent = r.tarifa_ida ? `ida R$ ${r.tarifa_ida} · volta R$ ${r.tarifa_volta}` : '';
+  el.children[3].innerHTML = statusHtml;
+}
+
+// ── Progress ──────────────────────────────────────────────────
+
+function updateProgress(){
+  const total = B.rows.length;
+  const done  = B.rows.filter(r=>r.status==='done'||r.status==='error').length;
+  const ok    = B.rows.filter(r=>r.status==='done').length;
+  const err   = B.rows.filter(r=>r.status==='error').length;
+  const pct   = total ? Math.round(done/total*100) : 0;
+
+  document.getElementById('batch-bar').style.width = pct+'%';
+  document.getElementById('batch-progress-pct').textContent = pct+'%';
+  document.getElementById('batch-progress-label').textContent =
+    B.running ? `Processando ${done} de ${total}…` : `Concluído — ${done} de ${total}`;
+
+  const summary = document.getElementById('batch-summary');
+  summary.innerHTML = `
+    <span class="batch-sum-item ok">✓ ${ok} calculado${ok!==1?'s':''}</span>
+    ${err ? `<span class="batch-sum-item err">⚠ ${err} erro${err!==1?'s':''}</span>` : ''}
+    <span class="batch-sum-item">${total-done} pendente${total-done!==1?'s':''}</span>
+  `;
+}
+
+// ── Core: process one employee ────────────────────────────────
+
+async function processEmployee(row, cepEmp, dias){
+  const cepFunc = row.cep.replace(/\D/g,'');
+  if(cepFunc.length < 8) throw new Error('CEP inválido');
+
+  const chegada = nextWeekday(document.getElementById('h-chegada').value, 1);
+  const saida   = nextWeekday(document.getElementById('h-saida').value, 1);
+
+  const [dataIda, dataVolta] = await Promise.all([
+    directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada),
+    directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida),
+  ]);
+
+  const rotasIda   = (dataIda.routes||[]).slice(0,6);
+  const rotasVolta = (dataVolta.routes||[]).slice(0,6);
+
+  if(!rotasIda.length || !rotasVolta.length) throw new Error('Sem rotas encontradas');
+
+  // Pick cheapest route
+  const bestIda   = rotasIda.reduce((b,r)=>getFareEstimate(r)<getFareEstimate(b)?r:b, rotasIda[0]);
+  const bestVolta = rotasVolta.reduce((b,r)=>getFareEstimate(r)<getFareEstimate(b)?r:b, rotasVolta[0]);
+
+  const fIda   = getFareEstimate(bestIda);
+  const fVolta = getFareEstimate(bestVolta);
+
+  if(fIda===Infinity || fVolta===Infinity) throw new Error('Tarifa não disponível');
+
+  return {
+    tarifa_ida:   brl(fIda),
+    tarifa_volta: brl(fVolta),
+    total_dia:    brl(fIda+fVolta),
+    total_mes:    brl((fIda+fVolta)*dias),
+  };
+}
+
+// ── Run all ───────────────────────────────────────────────────
+
+async function runBatch(){
+  const key    = document.getElementById('api-key').value.trim();
+  const cepEmp = document.getElementById('cep-emp').value.replace(/\D/g,'');
+  if(!key){ alert('Informe a chave da API.'); return; }
+  if(cepEmp.length<8){ alert('Informe o CEP da empresa.'); return; }
+  if(!B.rows.length){ alert('Carregue um CSV primeiro.'); return; }
+
+  B.running = true;
+  document.getElementById('btn-batch-run').disabled = true;
+  document.getElementById('btn-batch-run').innerHTML = '<span class="spinner"></span>Calculando...';
+  document.getElementById('batch-progress-wrap').classList.remove('hidden');
+  document.getElementById('btn-batch-download').classList.add('hidden');
+
+  // Load SDK once
+  try { await loadSDK(key); } catch(e){ alert(e.message); B.running=false; return; }
+
+  const dias = parseInt(document.getElementById('dias').value)||22;
+  const CONCURRENCY = 3; // parallel requests
+
+  // Reset pending rows
+  B.rows.forEach(r=>{ if(r.status!=='done') r.status='pending'; });
+  renderBatchTable();
+
+  const queue = B.rows.map((_,i)=>i).filter(i=>B.rows[i].status!=='done');
+
+  async function worker(){
+    while(queue.length){
+      const i = queue.shift();
+      const r = B.rows[i];
+      r.status = 'running';
+      updateBatchRow(i);
+      updateProgress();
+      try {
+        const result = await processEmployee(r, cepEmp, dias);
+        Object.assign(r, result);
+        r.status = 'done';
+      } catch(e){
+        r.status = 'error';
+        r.erro = e.message;
+      }
+      updateBatchRow(i);
+      updateProgress();
+      // Small delay to avoid hammering the API
+      await new Promise(res=>setTimeout(res, 200));
+    }
+  }
+
+  await Promise.all(Array.from({length: CONCURRENCY}, ()=>worker()));
+
+  B.running = false;
+  document.getElementById('btn-batch-run').disabled = false;
+  document.getElementById('btn-batch-run').innerHTML = '▶ Recalcular';
+  document.getElementById('btn-batch-download').classList.remove('hidden');
+  updateProgress();
+}
+
+// ── Download CSV ──────────────────────────────────────────────
+
+function downloadBatchCSV(){
+  const dias = parseInt(document.getElementById('dias').value)||22;
+  const header = ['codigo','cep','tarifa_ida','tarifa_volta','total_dia',`total_mes_${dias}d`,'status','observacao'];
+  const lines = [header.join(';')];
+  B.rows.forEach(r=>{
+    lines.push([
+      r.codigo, r.cep,
+      r.tarifa_ida||'', r.tarifa_volta||'',
+      r.total_dia||'', r.total_mes||'',
+      r.status==='done'?'ok':r.status==='error'?'erro':'pendente',
+      r.erro||''
+    ].join(';'));
+  });
+  const blob = new Blob(['\uFEFF'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vale_transporte_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function clearBatch(){
+  B.rows = [];
+  document.getElementById('batch-table-wrap').innerHTML='';
+  document.getElementById('batch-table-wrap').classList.add('hidden');
+  document.getElementById('batch-progress-wrap').classList.add('hidden');
+  document.getElementById('batch-actions').classList.add('hidden');
+  document.getElementById('batch-file-input').value='';
+}
 </script>
 <p style="text-align:center;font-size:11px;color:var(--text3);padding:0 1rem 2rem">
   Estimativas baseadas na tabela SP vigente desde 06/01/2026 —
