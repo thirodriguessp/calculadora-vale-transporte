@@ -275,9 +275,9 @@ async function iniciar(){
       directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida)
     ]);
 
-    // Store all routes (up to 4 each)
-    S.rotasIda  = (dataIda.routes||[]).slice(0,4);
-    S.rotasVolta = (dataVolta.routes||[]).slice(0,4);
+    // Store all routes
+    S.rotasIda  = (dataIda.routes||[]).slice(0,6);
+    S.rotasVolta = (dataVolta.routes||[]).slice(0,6);
 
     buildCenarios();
 
@@ -543,7 +543,7 @@ function renderRotas(dir, data){
     ? `<div class="alert alert-ok" style="margin-bottom:10px">✓ API retornou tarifas em ${comTarifa} de ${rotas.length} rota(s)</div>`
     : `<div class="alert alert-warn" style="margin-bottom:10px">⚠ API não retornou tarifas — informe o valor manualmente</div>`;
 
-  const lista = rotas.slice(0,4).sort((a,b)=>getFareEstimate(a)-getFareEstimate(b));
+  const lista = rotas.slice(0,6).sort((a,b)=>getFareEstimate(a)-getFareEstimate(b));
   // Store sorted list back so cenario indices still map correctly — but cenarios were built before sort, so we need to keep original order for cenarios and use a display index for cards
   // Use data-routeidx to track the original position in S.rotasIda/Volta
   const originalList = dir==='ida' ? S.rotasIda : S.rotasVolta;
