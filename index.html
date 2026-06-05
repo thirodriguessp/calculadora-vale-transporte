@@ -229,13 +229,16 @@ function loadSDK(key){
   });
 }
 
-function directionsRequest(origin, dest, arrivalTime){
+function directionsRequest(origin, dest, time, mode='arrival'){
   return new Promise((res, rej) => {
     const svc = new google.maps.DirectionsService();
+    const transitOptions = mode === 'departure'
+      ? { departureTime: time }
+      : { arrivalTime: time };
     svc.route({
       origin, destination: dest,
       travelMode: google.maps.TravelMode.TRANSIT,
-      transitOptions: { arrivalTime },
+      transitOptions,
       provideRouteAlternatives: true,
       region: 'BR'
     }, (result, status) => {
@@ -271,8 +274,8 @@ async function iniciar(){
     const saida   = nextWeekday(document.getElementById('h-saida').value, 1);
 
     const [dataIda, dataVolta] = await Promise.all([
-      directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada),
-      directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida)
+      directionsRequest(`${cepFunc}, SP, Brasil`, `${cepEmp}, SP, Brasil`, chegada, 'arrival'),
+      directionsRequest(`${cepEmp}, SP, Brasil`, `${cepFunc}, SP, Brasil`, saida,   'departure')
     ]);
 
     // Store all routes
